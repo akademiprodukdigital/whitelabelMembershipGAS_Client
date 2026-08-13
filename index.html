@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Whitelabel Membership</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        sidebar: '#161b2a', sidebarhover: '#242b42',
+                        brandblue: '#3b82f6', bglight: '#f8f9fc'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .card-decoration {
+            position: absolute; bottom: -20px; right: -20px;
+            width: 100px; height: 100px; border-radius: 50%;
+            background: rgba(255,255,255,0.15); z-index: 0;
+        }
+        .card-decoration::before {
+            content: ''; position: absolute; top: -30px; left: -30px;
+            width: 100px; height: 100px; border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+        }
+
+        #loadingOverlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(4px);
+            z-index: 9999; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; transition: opacity 0.3s ease;
+        }
+
+        .toast-msg {
+            position: fixed; top: 20px; right: 20px; z-index: 10000;
+            padding: 15px 25px; border-radius: 8px; font-weight: 600;
+            color: white; transform: translateX(150%);
+            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
+        }
+        .toast-msg.show { transform: translateX(0); }
+        .toast-success { background-color: #10b981; }
+        .toast-error { background-color: #ef4444; }
+        
+        .data-table th { background-color: #f8fafc; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; color: #64748b; padding: 1rem; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        .data-table td { padding: 1rem; border-bottom: 1px solid #e2e8f0; font-size: 0.875rem; color: #334155; }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table tr:hover { background-color: #f8fafc; }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+            z-index: 9990; display: none; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: white; border-radius: 1.5rem; width: 100%; max-width: 500px;
+            padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transform: scale(0.95); transition: all 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* DEMO MARQUEE - ADDED ONLY FOR DEMO NOTICE */
+        .demo-marquee {
+            width: 100%;
+            flex-shrink: 0;
+            overflow: hidden;
+            position: relative;
+            z-index: 19;
+            border-bottom: 1px solid #fde68a;
+            background: linear-gradient(90deg, #fff7ed 0%, #fffbeb 50%, #fff7ed 100%);
+            color: #92400e;
+        }
+
+        .demo-marquee-track {
+            display: flex;
+            width: max-content;
+            min-width: 100%;
+            animation: demoMarqueeScroll 28s linear infinite;
+            will-change: transform;
+        }
+
+        .demo-marquee-content {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 28px;
+            white-space: nowrap;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .demo-marquee-content i {
+            color: #f59e0b;
+            font-size: 14px;
+        }
+
+        .demo-marquee:hover .demo-marquee-track {
+            animation-play-state: paused;
+        }
+
+        @keyframes demoMarqueeScroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+
+        @media (max-width: 768px) {
+            .demo-marquee-content {
+                padding: 9px 20px;
+                font-size: 12px;
+            }
+
+            .demo-marquee-track {
+                animation-duration: 34s;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .demo-marquee-track {
+                animation: none;
+            }
+        }
+
+    </style>
+</head>
+<body class="bg-bglight text-gray-800 font-sans h-screen overflow-hidden">
+
+    <div id="loadingOverlay" style="display: none; opacity: 0;">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500 mb-3"></i>
+        <p id="loadingText" class="text-sm font-medium text-gray-600">Memproses...</p>
+    </div>
+
+    <div id="toast" class="toast-msg">Pesan disini</div>
+
+    <div id="modalAddProduct" class="modal-overlay">
+        <div class="modal-content relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('modalAddProduct')" class="absolute top-6 right-6 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">Tambah Produk Baru</h3>
+            <p class="text-sm text-gray-500 mb-6">Isi detail produk digital yang akan dijual.</p>
+            
+            <form id="formAddProduct" onsubmit="submitAddProduct(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Nama Produk</label>
+                    <input type="text" id="addProdName" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="Contoh: E-Course Jago Jualan">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Harga (Rp)</label>
+                        <input type="number" id="addProdPrice" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="150000">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Tipe Komisi</label>
+                        <select id="addProdCommType" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none bg-white">
+                            <option value="nominal">Nominal (Rp)</option>
+                            <option value="persentase">Persentase (%)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Nilai Komisi</label>
+                    <input type="number" id="addProdComm" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="Masukkan nilai (misal: 50000 atau 20)">
+                    <p class="text-xs text-gray-500 mt-1">Jika persentase, masukkan angka 1-100.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">URL Gambar Produk</label>
+                    <input type="url" id="addProdImage" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="https://imgur.com/gambar-produk.png">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Link Akses File/Materi</label>
+                    <input type="url" id="addProdLink" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="https://drive.google.com/...">
+                    <p class="text-xs text-gray-500 mt-1">Link ini akan diberikan ke pembeli setelah transaksi berstatus PAID.</p>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors mt-4">
+                    <i class="fa-solid fa-plus mr-2"></i> Simpan Produk
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalAddMember" class="modal-overlay">
+        <div class="modal-content relative">
+            <button onclick="closeModal('modalAddMember')" class="absolute top-6 right-6 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">Tambah Member / Admin</h3>
+            <p class="text-sm text-gray-500 mb-6">Tambahkan user secara manual ke dalam sistem.</p>
+            
+            <form id="formAddMember" onsubmit="submitAddMember(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Nama Lengkap</label>
+                    <input type="text" id="addMemName" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="Budi Santoso">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                    <input type="email" id="addMemEmail" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="budi@email.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Password</label>
+                    <input type="text" id="addMemPass" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="Minimal 6 karakter">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Role / Hak Akses</label>
+                    <select id="addMemTier" class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none bg-white">
+                        <option value="Member">Member Biasa</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors mt-4">
+                    <i class="fa-solid fa-user-plus mr-2"></i> Tambahkan Akun
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalChangePassword" class="modal-overlay">
+        <div class="modal-content relative">
+            <button onclick="closeModal('modalChangePassword')" class="absolute top-6 right-6 text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2">Ganti Password</h3>
+            <p class="text-sm text-gray-500 mb-6">Amankan akun Anda dengan mengganti password.</p>
+            <form id="formChangePassword" onsubmit="submitChangePassword(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Password Lama</label>
+                    <input type="password" id="oldPass" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Password Baru</label>
+                    <input type="password" id="newPass" required class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="Minimal 6 karakter">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl mt-4 transition-colors">
+                    <i class="fa-solid fa-key mr-2"></i> Simpan Password Baru
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="authView" class="h-full w-full flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl flex max-w-4xl w-full overflow-hidden min-h-[550px]">
+            <div class="hidden md:flex md:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-800 p-12 flex-col justify-between text-white relative overflow-hidden">
+                <div class="relative z-10">
+                    <div id="authBrandLogo" class="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center font-bold text-2xl backdrop-blur-sm mb-6 overflow-hidden">
+                        <i class="fa-solid fa-cube"></i>
+                    </div>
+                    <h1 id="authBrandName" class="text-4xl font-extrabold mb-4 leading-tight">Whitelabel<br>Membership.</h1>
+                    <p class="text-blue-100 opacity-90">Kelola member, produk, dan sistem affiliate dalam satu ekosistem yang terintegrasi secara seamless.</p>
+                </div>
+                <div class="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-2xl opacity-70"></div>
+                <div class="absolute top-10 -right-10 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-2xl opacity-70"></div>
+            </div>
+
+            <div class="w-full md:w-1/2 p-8 sm:p-12 flex flex-col justify-center relative">
+                <div id="formLoginContainer">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Selamat Datang Kembali</h2>
+                    <p class="text-sm text-gray-500 mb-8">Silakan masukkan detail akun Anda untuk masuk ke Dashboard.</p>
+                    <form id="loginForm" class="space-y-5" onsubmit="handleAuth(event, 'login')">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                            <input type="email" id="loginEmail" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" placeholder="nama@email.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                            <input type="password" id="loginPassword" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg shadow-blue-500/30">
+                            Masuk ke Dashboard
+                        </button>
+                    </form>
+                    <p class="text-center mt-6 text-sm text-gray-600">
+                        Belum punya akun? <a href="#" onclick="toggleAuthView('register')" class="text-blue-600 font-bold hover:underline">Daftar sekarang</a>
+                    </p>
+                </div>
+
+                <div id="formRegisterContainer" style="display: none;">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Buat Akun Baru</h2>
+                    <p class="text-sm text-gray-500 mb-6">Daftar sekarang untuk mendapatkan akses ke platform.</p>
+                    <form id="registerForm" class="space-y-4" onsubmit="handleAuth(event, 'register')">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Nama Lengkap</label>
+                            <input type="text" id="regName" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="Budi Santoso">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                            <input type="email" id="regEmail" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="nama@email.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                            <input type="password" id="regPassword" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none" placeholder="Minimal 6 karakter">
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors mt-2">
+                            Daftar Akun
+                        </button>
+                    </form>
+                    <p class="text-center mt-6 text-sm text-gray-600">
+                        Sudah punya akun? <a href="#" onclick="toggleAuthView('login')" class="text-blue-600 font-bold hover:underline">Masuk di sini</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboardView" class="h-full w-full flex overflow-hidden" style="display: none;">
+        
+        <aside class="w-64 bg-sidebar text-gray-300 flex-col h-full hidden md:flex flex-shrink-0 relative z-30 shadow-xl">
+            <div class="h-20 flex items-center px-6 border-b border-gray-800 flex-shrink-0">
+                <div id="sidebarBrandLogo" class="w-10 h-10 bg-brandblue rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/30 mr-3 overflow-hidden">
+                    <i class="fa-solid fa-cube text-xl"></i>
+                </div>
+                <div>
+                    <h1 id="sidebarBrandName" class="text-white font-bold text-sm tracking-wide leading-tight truncate w-36">Whitelabel</h1>
+                    <p class="text-[10px] text-blue-400 tracking-wider uppercase mt-1">Membership</p>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+                <a href="#" onclick="switchTab('dashboard')" id="nav-dashboard" class="flex items-center px-4 py-3 bg-brandblue text-white rounded-xl shadow-md group transition-all nav-item">
+                    <i class="fa-solid fa-border-all w-6 text-center text-lg"></i><span class="ml-3 text-sm font-medium">Dashboard</span>
+                </a>
+                
+                <a href="#" onclick="switchTab('my-products')" id="nav-my-products" class="member-only hidden items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-sidebarhover rounded-xl group transition-all nav-item">
+                    <i class="fa-solid fa-box-open w-6 text-center text-lg"></i><span class="ml-3 text-sm font-medium">Produk Saya</span>
+                </a>
+
+                <a href="#" onclick="switchTab('member')" id="nav-member" class="admin-only hidden items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-sidebarhover rounded-xl group transition-all nav-item">
+                    <i class="fa-solid fa-users w-6 text-center text-lg"></i><span class="ml-3 text-sm font-medium">Member</span>
+                </a>
+                
+                <a href="#" onclick="switchTab('produk')" id="nav-produk" class="admin-only hidden items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-sidebarhover rounded-xl group transition-all nav-item">
+                    <i class="fa-solid fa-box w-6 text-center text-lg"></i><span class="ml-3 text-sm font-medium">Produk</span>
+                </a>
+                
+                <a href="#" onclick="switchTab('transaksi')" id="nav-transaksi" class="admin-only hidden items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-sidebarhover rounded-xl group transition-all nav-item">
+                    <i class="fa-solid fa-wallet w-6 text-center text-lg"></i><span class="ml-3 text-sm font-medium">Transaksi</span>
+                </a>
+                
+                <a href="#" onclick="switchTab('affiliate')" id="nav-affiliate" class="flex items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-sidebarhover rounded-xl group transition-all nav-item">
+                    <i class="fa-solid fa-handshake w-6 text-center text-lg"></i><span class="ml-3 text-sm font-medium">Affiliate</span>
+                </a>
+
+                <a href="#" onclick="switchTab('settings')" id="nav-settings" class="flex items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-sidebarhover rounded-xl group transition-all nav-item mt-4">
+                    <i class="fa-solid fa-gear w-6 text-center text-lg"></i><span class="ml-3 text-sm font-medium">Pengaturan</span>
+                </a>
+            </div>
+
+            <div class="p-4 border-t border-gray-800">
+                <div class="flex items-center">
+                    <div id="sidebarUserInisial" class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">U</div>
+                    <div class="ml-3">
+                        <p id="sidebarUserName" class="text-sm font-semibold text-white truncate w-32">User Name</p>
+                        <p id="sidebarUserTier" class="text-xs text-gray-500">Member</p>
+                    </div>
+                </div>
+                
+                <button onclick="openModal('modalChangePassword')" class="mt-5 flex items-center text-gray-400 hover:text-white text-sm font-medium px-2 py-1 w-full text-left transition-colors">
+                    <i class="fa-solid fa-key mr-2"></i> Ganti Password
+                </button>
+                
+                <button onclick="doLogout()" class="mt-2 flex items-center text-red-400 hover:text-red-300 text-sm font-medium px-2 py-1 w-full text-left transition-colors">
+                    <i class="fa-solid fa-arrow-right-from-bracket mr-2"></i> Keluar Akun
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-gray-50 relative z-10 w-full">
+            <header class="h-20 bg-white/80 backdrop-blur-md px-8 flex items-center justify-between border-b border-gray-100 flex-shrink-0 sticky top-0 z-20 shadow-sm w-full">
+                <div><h2 class="text-xl font-bold text-gray-800" id="headerTitle">Dashboard</h2></div>
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold shadow-sm" id="headerUserInisial">U</div>
+                </div>
+            </header>
+
+            <!-- DEMO MARQUEE - ADDED ONLY FOR DEMO NOTICE -->
+            <div class="demo-marquee" role="status" aria-label="Informasi akses demo">
+                <div class="demo-marquee-track">
+                    <div class="demo-marquee-content">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>Ini Akses Demo Whitelabel Membership Versi GAS. Silakan explore semua fitur sampai dengan checkout. Pastikan Anda memahami semua fitur dan uji coba ini sebelum membeli Whitelabel Membership. Jika setuju dan ingin membeli, silakan klik link di Member Area Akses Demo.</span>
+                    </div>
+                    <div class="demo-marquee-content" aria-hidden="true">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>Ini Akses Demo Whitelabel Membership Versi GAS. Silakan explore semua fitur sampai dengan checkout. Pastikan Anda memahami semua fitur dan uji coba ini sebelum membeli Whitelabel Membership. Jika setuju dan ingin membeli, silakan klik link di Member Area Akses Demo.</span>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 relative w-full">
+                
+                <div id="tab-dashboard" class="tab-content active space-y-6 w-full">
+                    <div class="bg-indigo-600 rounded-2xl p-6 md:p-8 text-white shadow-lg flex items-center justify-between relative overflow-hidden min-h-[140px]">
+                        <div class="relative z-10">
+                            <h2 class="text-2xl md:text-3xl font-bold mb-2">Halo, <span id="welcomeName">Member</span>! 👋</h2>
+                            <p class="text-indigo-100 text-sm md:text-base">Pantau aktivitas dan perkembangan Anda hari ini.</p>
+                        </div>
+                        <div class="absolute -right-10 -bottom-20 opacity-30 text-9xl"><i class="fa-solid fa-chart-line"></i></div>
+                    </div>
+
+                    <!-- Admin Stats Grid -->
+                    <div id="adminStatsArea" class="admin-only hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+                        <div class="bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Total Member</p>
+                            <h3 id="statTotalMember" class="text-3xl font-extrabold mb-1">0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                        <div class="bg-gradient-to-br from-indigo-500 to-purple-400 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Total Transaksi</p>
+                            <h3 id="statTotalTx" class="text-3xl font-extrabold mb-1">0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                        <div class="bg-gradient-to-br from-pink-500 to-rose-400 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Total Pendapatan</p>
+                            <h3 id="statTotalRev" class="text-3xl font-extrabold mb-1">Rp 0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                        <div class="bg-gradient-to-br from-emerald-500 to-green-400 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Member Aktif</p>
+                            <h3 id="statActiveMember" class="text-3xl font-extrabold mb-1">0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                    </div>
+
+                    <!-- Member Stats Grid -->
+                    <div id="memberStatsArea" class="member-only hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+                        <div class="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Total Referral (Lead)</p>
+                            <h3 id="memStatReferral" class="text-3xl font-extrabold mb-1">0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                        <div class="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Komisi Pending</p>
+                            <h3 id="memStatPending" class="text-3xl font-extrabold mb-1">Rp 0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Komisi Dibayar</p>
+                            <h3 id="memStatDibayar" class="text-3xl font-extrabold mb-1">Rp 0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+                            <p class="text-xs font-bold tracking-wider uppercase opacity-80 mb-2">Total Komisi</p>
+                            <h3 id="memStatTotal" class="text-3xl font-extrabold mb-1 truncate">Rp 0</h3>
+                            <div class="card-decoration"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+                        
+                        <div class="admin-only hidden lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+                            <h3 class="text-lg font-bold text-gray-800 mb-6 flex-shrink-0">Grafik Aktivitas</h3>
+                            <div class="relative w-full flex-1 min-h-[250px]"><canvas id="transactionChart"></canvas></div>
+                        </div>
+                        
+                        <div class="flex flex-col gap-6 lg:col-span-1 h-full">
+                            <div class="bg-white rounded-2xl p-6 shadow-sm border border-blue-100 h-full flex flex-col">
+                                <h3 class="text-base font-bold text-gray-800 mb-2"><i class="fa-solid fa-link text-blue-500 mr-2"></i> Link Affiliate Anda</h3>
+                                <p class="text-xs text-gray-500 mb-4 flex-1">Sebarkan link ini, dapatkan komisi tambahan untuk setiap penjualan sukses!</p>
+                                <div class="relative mb-3 w-full">
+                                    <input type="text" id="affLink" value="..." readonly class="w-full bg-gray-50 border border-gray-200 text-gray-600 text-sm rounded-lg px-4 py-3 outline-none overflow-hidden text-ellipsis whitespace-nowrap">
+                                </div>
+                                <button onclick="copyAffiliateLink(this)" class="w-full bg-gray-900 hover:bg-blue-600 text-white font-medium rounded-lg text-sm px-5 py-3 transition-colors flex justify-center items-center mt-auto">
+                                    <i class="fa-regular fa-copy mr-2"></i> Salin Link
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div id="tab-my-products" class="tab-content space-y-6 w-full">
+                    <h2 class="text-2xl font-bold text-gray-800">Akses Produk Saya</h2>
+                    <p class="text-gray-500 mb-6 text-sm">Daftar produk digital yang telah sukses Anda beli. Klik tombol untuk mulai mempelajari.</p>
+                    <div id="myProductsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Dimuat dari Javascript -->
+                    </div>
+                </div>
+
+                <div id="tab-member" class="tab-content space-y-6 w-full">
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">Daftar Akun Pengguna</h3>
+                                <p class="text-sm text-gray-500">Kelola member terdaftar di ekosistem Anda.</p>
+                            </div>
+                            <button onclick="openModal('modalAddMember')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl shadow-sm text-sm transition-colors whitespace-nowrap">
+                                <i class="fa-solid fa-user-plus mr-1"></i> Tambah Member
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-gray-100">
+                            <table class="w-full data-table">
+                                <thead><tr><th>ID</th><th>Nama</th><th>Email</th><th>Tier</th><th>Kode Affiliate</th><th>Tanggal Daftar</th></tr></thead>
+                                <tbody id="tableBodyMembers">
+                                    <tr><td colspan="6" class="text-center py-8 text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-produk" class="tab-content space-y-6 w-full">
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">Katalog Produk Digital</h3>
+                                <p class="text-sm text-gray-500">Daftar produk yang aktif dan siap dijual.</p>
+                            </div>
+                            <button onclick="openModal('modalAddProduct')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl shadow-sm text-sm transition-colors whitespace-nowrap">
+                                <i class="fa-solid fa-plus mr-1"></i> Tambah Produk
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-gray-100">
+                            <table class="w-full data-table">
+                                <thead><tr><th>Produk</th><th>Harga</th><th>Komisi</th><th>Link Akses</th><th>Status</th></tr></thead>
+                                <tbody id="tableBodyProducts">
+                                    <tr><td colspan="5" class="text-center py-8 text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-transaksi" class="tab-content space-y-6 w-full">
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">Riwayat Transaksi</h3>
+                                <p class="text-sm text-gray-500">Klik "Approve" setelah mengecek mutasi transfer pembeli.</p>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-gray-100">
+                            <table class="w-full data-table">
+                                <thead><tr><th>Invoice</th><th>Tanggal</th><th>Data Pembeli</th><th>Produk</th><th>Total Bayar</th><th>Status</th><th>Aksi</th></tr></thead>
+                                <tbody id="tableBodyTransactions">
+                                    <tr><td colspan="7" class="text-center py-8 text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-affiliate" class="tab-content space-y-6 w-full">
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-bold text-gray-800">Riwayat Komisi Affiliate</h3>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-gray-100">
+                            <table class="w-full data-table">
+                                <thead><tr><th>Tanggal & ID</th><th>Affiliate</th><th>Nominal</th><th>Rekening Tujuan</th><th>Status</th><th class="admin-only hidden">Aksi</th></tr></thead>
+                                <tbody id="tableBodyCommissions">
+                                    <tr><td colspan="6" class="text-center py-8 text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-settings" class="tab-content space-y-6 w-full">
+                    
+                    <div id="adminSettingsPanel" class="admin-only hidden bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                        <div class="flex items-center mb-6">
+                            <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl mr-3">
+                                <i class="fa-solid fa-store"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">Pengaturan Toko & Pembayaran</h3>
+                                <p class="text-sm text-gray-500">Sesuaikan brand toko, nomor WhatsApp, dan rekening pembayaran.</p>
+                            </div>
+                        </div>
+
+                        <form id="settingsForm" onsubmit="handleSaveSettings(event)">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 pb-6 border-b border-gray-100">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Brand / Toko</label>
+                                    <input type="text" id="setStoreName" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all">
+                                    <p class="text-xs text-gray-500 mt-1">Nama ini akan tampil di Sidebar dan Halaman Checkout.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">URL Logo Toko (Opsional)</label>
+                                    <input type="text" id="setStoreLogo" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all" placeholder="https://imgur.com/logo-anda.png">
+                                    <p class="text-xs text-gray-500 mt-1">Link gambar logo. Kosongkan jika ingin pakai teks inisial.</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nomor WhatsApp Admin</label>
+                                    <div class="flex">
+                                        <span class="inline-flex items-center px-4 text-sm text-gray-900 bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl font-bold">+62</span>
+                                        <input type="text" id="setWa" class="rounded-none rounded-r-xl border border-gray-200 text-gray-900 focus:ring-blue-500 block flex-1 min-w-0 w-full text-sm p-3 outline-none" placeholder="81234567890">
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">Nomor untuk menerima bukti transfer dari pembeli.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">URL Gambar QRIS Statis (Opsional)</label>
+                                    <input type="text" id="setQris" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all" placeholder="https://imgur.com/qris-anda.png">
+                                    <p class="text-xs text-gray-500 mt-1">Link gambar barcode QRIS. Kosongkan jika tidak pakai QRIS.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 pb-6 border-b border-gray-100">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Kolom Nama (Checkout)</label>
+                                    <select id="setFormName" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none bg-white">
+                                        <option value="required">Wajib Isi</option>
+                                        <option value="optional">Opsional (Boleh Kosong)</option>
+                                        <option value="hidden">Sembunyikan</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Kolom WhatsApp (Checkout)</label>
+                                    <select id="setFormWa" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none bg-white">
+                                        <option value="required">Wajib Isi</option>
+                                        <option value="optional">Opsional (Boleh Kosong)</option>
+                                        <option value="hidden">Sembunyikan</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-8">
+                                <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+                                    <label class="block text-sm font-bold text-gray-700">Daftar Rekening Bank</label>
+                                    <button type="button" onclick="addBankField()" class="text-xs bg-blue-50 text-blue-600 font-bold px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors border border-blue-100">
+                                        <i class="fa-solid fa-plus mr-1"></i> Tambah Rekening
+                                    </button>
+                                </div>
+                                <div id="bankList" class="space-y-3"></div>
+                            </div>
+                            <div class="pt-4 border-t border-gray-100">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center">
+                                    <i class="fa-solid fa-floppy-disk mr-2"></i> Simpan Pengaturan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Member Bank Settings Panel -->
+                    <div id="memberSettingsPanel" class="member-only hidden bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                        <div class="flex items-center mb-6">
+                            <div class="w-10 h-10 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-xl mr-3">
+                                <i class="fa-solid fa-money-check-dollar"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800">Rekening Pencairan Komisi</h3>
+                                <p class="text-sm text-gray-500">Pastikan data rekening benar agar komisi affiliate sampai ke tangan Anda.</p>
+                            </div>
+                        </div>
+                        <form id="memberBankForm" onsubmit="handleSaveMemberBank(event)">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Bank / E-Wallet</label>
+                                    <input type="text" id="memBankName" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all" placeholder="Contoh: BCA / GoPay">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nomor Rekening</label>
+                                    <input type="text" id="memBankRek" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all" placeholder="1234567890">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Pemilik Rekening</label>
+                                    <input type="text" id="memBankOwner" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all" placeholder="Sesuai buku tabungan">
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-gray-100">
+                                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-xl transition-colors shadow-lg shadow-green-500/30 flex items-center">
+                                    <i class="fa-solid fa-floppy-disk mr-2"></i> Simpan Rekening
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // MASUKIN URL WEB APP GAS LO DI SINI
+        const API_URL = "MASUKIN URL WEB APP GAS LO DI SINI"; 
+
+        async function callAPI(action, payload = {}) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000); 
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    redirect: 'follow',
+                    body: JSON.stringify({ action: action, payload: payload }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId); 
+                
+                if (!response.ok) {
+                     throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const text = await response.text();
+                
+                if (text.includes("Gunakan POST") || text.startsWith("API ")) {
+                    throw new Error("Koneksi diblokir oleh browser. Coba refresh atau gunakan mode Incognito.");
+                }
+                if (text.trim().startsWith('<')) {
+                    throw new Error("API Terblokir. Pastikan akses Google Script di-set ke 'Anyone'!");
+                }
+                return JSON.parse(text);
+                
+            } catch (error) {
+                clearTimeout(timeoutId); 
+                if (error.name === 'AbortError') {
+                    throw new Error("Koneksi ke database terlalu lambat (Timeout). Coba lagi.");
+                }
+                throw new Error(error.message || "Gagal menghubungi server database.");
+            }
+        }
+
+        async function hashPassword(password) {
+            try {
+                const msgBuffer = new TextEncoder().encode(password);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch (e) {
+                return btoa(password).substring(0, 30);
+            }
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.className = `toast-msg toast-${type} show`;
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        function showLoading(text) {
+            document.getElementById('loadingText').innerText = text;
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+            setTimeout(() => { overlay.style.opacity = '1'; }, 10);
+        }
+        
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        function toggleAuthView(view) {
+            if(view === 'register') {
+                document.getElementById('formLoginContainer').style.display = 'none';
+                document.getElementById('formRegisterContainer').style.display = 'block';
+            } else {
+                document.getElementById('formRegisterContainer').style.display = 'none';
+                document.getElementById('formLoginContainer').style.display = 'block';
+            }
+        }
+
+        async function handleAuth(e, action) {
+            e.preventDefault();
+            showLoading(action === 'login' ? "Memeriksa kredensial..." : "Membuat akun baru...");
+            
+            try {
+                let payload = {};
+                if (action === 'login') {
+                    payload = { 
+                        email: document.getElementById('loginEmail').value, 
+                        password: await hashPassword(document.getElementById('loginPassword').value) 
+                    };
+                } else {
+                    const plainPass = document.getElementById('regPassword').value;
+                    if(plainPass.length < 6) throw new Error("Password minimal 6 karakter!");
+                    payload = { 
+                        nama: document.getElementById('regName').value, 
+                        email: document.getElementById('regEmail').value, 
+                        password: await hashPassword(plainPass) 
+                    };
+                }
+                
+                const result = await callAPI(action, payload);
+                
+                if (result.status === 'success') {
+                    showToast(result.message, "success");
+                    sessionStorage.setItem('wm_user', JSON.stringify(result.user));
+                    checkLoginState(); 
+                } else { 
+                    showToast(result.message, "error"); 
+                }
+            } catch (error) { 
+                showToast(error.message, "error"); 
+            } finally { 
+                hideLoading(); 
+            }
+        }
+
+        function checkLoginState() {
+            try {
+                const userData = sessionStorage.getItem('wm_user');
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    document.getElementById('authView').style.display = 'none';
+                    document.getElementById('dashboardView').style.display = 'flex';
+                    
+                    const inisial = user.nama.charAt(0).toUpperCase();
+                    document.getElementById('sidebarUserName').innerText = user.nama;
+                    document.getElementById('welcomeName').innerText = user.nama.split(" ")[0];
+                    document.getElementById('sidebarUserTier').innerText = user.tier;
+                    document.getElementById('sidebarUserInisial').innerText = inisial;
+                    document.getElementById('headerUserInisial').innerText = inisial;
+                    
+                    const domain = window.location.origin + window.location.pathname.replace('index.html', '');
+                    document.getElementById('affLink').value = `${domain}/checkout.html?aff=${user.affCode}`;
+
+                    if(user.tier === 'Admin') {
+                        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+                        document.querySelectorAll('.member-only').forEach(el => el.classList.add('hidden'));
+                    } else {
+                        document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+                        document.querySelectorAll('.member-only').forEach(el => el.classList.remove('hidden'));
+                    }
+
+                    switchTab('dashboard');
+                    fetchStoreSettings(true); 
+                } else {
+                    document.getElementById('authView').style.display = 'flex';
+                    document.getElementById('dashboardView').style.display = 'none';
+                    fetchStoreSettings(true); 
+                }
+            } catch (err) {
+                sessionStorage.removeItem('wm_user');
+                document.getElementById('authView').style.display = 'flex';
+                document.getElementById('dashboardView').style.display = 'none';
+            }
+        }
+
+        function doLogout() {
+            sessionStorage.removeItem('wm_user');
+            checkLoginState();
+            showToast("Anda telah keluar.", "success");
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => {
+                const isAdminOnly = el.classList.contains('admin-only');
+                const isMemberOnly = el.classList.contains('member-only');
+                const isHidden = el.classList.contains('hidden');
+                el.className = `flex items-center px-4 py-3 text-gray-400 hover:text-white hover:bg-sidebarhover rounded-xl group transition-all nav-item ${isAdminOnly ? 'admin-only' : ''} ${isMemberOnly ? 'member-only' : ''} ${isHidden ? 'hidden' : ''}`;
+            });
+            
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            if(activeNav) {
+                const isAdminOnly = activeNav.classList.contains('admin-only');
+                const isMemberOnly = activeNav.classList.contains('member-only');
+                const isHidden = activeNav.classList.contains('hidden');
+                activeNav.className = `flex items-center px-4 py-3 bg-brandblue text-white rounded-xl shadow-md group transition-all nav-item ${isAdminOnly ? 'admin-only' : ''} ${isMemberOnly ? 'member-only' : ''} ${isHidden ? 'hidden' : ''}`;
+            }
+            
+            const titles = { 
+                'dashboard': 'Dashboard', 
+                'my-products': 'Produk Saya',
+                'member': 'Kelola Member', 
+                'produk': 'Katalog Produk', 
+                'transaksi': 'Riwayat Transaksi', 
+                'affiliate': 'Komisi Affiliate', 
+                'settings': 'Pengaturan Toko' 
+            };
+            document.getElementById('headerTitle').innerText = titles[tabName];
+
+            if(tabName === 'dashboard') { fetchDashboardStats(); setupChart(); }
+            else if(tabName === 'member') { fetchData('getMembers', 'tableBodyMembers', renderMembers); }
+            else if(tabName === 'produk') { fetchData('getProducts', 'tableBodyProducts', renderProducts); }
+            else if(tabName === 'transaksi') { fetchData('getTransactions', 'tableBodyTransactions', renderTransactions); }
+            else if(tabName === 'affiliate') { fetchData('getCommissions', 'tableBodyCommissions', renderCommissions); }
+            else if(tabName === 'settings') { 
+                const user = JSON.parse(sessionStorage.getItem('wm_user'));
+                if(user.tier === 'Admin') fetchStoreSettings(false); 
+                else fetchMemberBank();
+            }
+        }
+
+        async function fetchDashboardStats() {
+            try {
+                const user = JSON.parse(sessionStorage.getItem('wm_user'));
+                if(user.tier === 'Admin') {
+                    const stats = await callAPI('getStats');
+                    if(stats.status === 'success') {
+                        document.getElementById('statTotalMember').innerText = stats.totalMember;
+                        document.getElementById('statTotalTx').innerText = stats.totalTransaksi;
+                        document.getElementById('statTotalRev').innerText = formatRupiah(stats.totalPendapatan);
+                        document.getElementById('statActiveMember').innerText = stats.memberAktif;
+                    }
+                } else {
+                    const res = await callAPI('getMemberDashboard', { email: user.email, affCode: user.affCode });
+                    if(res.status === 'success') {
+                        document.getElementById('memStatReferral').innerText = res.stats.referral;
+                        document.getElementById('memStatPending').innerText = formatRupiah(res.stats.pending);
+                        document.getElementById('memStatDibayar').innerText = formatRupiah(res.stats.dibayar);
+                        document.getElementById('memStatTotal').innerText = formatRupiah(res.stats.total);
+                        renderMyProductsGrid(res.myProducts);
+                    }
+                }
+            } catch (e) { console.error("Stats fetching error:", e); }
+        }
+
+        function renderMyProductsGrid(products) {
+            const grid = document.getElementById('myProductsGrid');
+            grid.innerHTML = '';
+            if(products.length === 0) {
+                grid.innerHTML = `<div class="col-span-full p-10 text-center bg-white rounded-2xl border border-gray-100"><i class="fa-solid fa-box-open text-4xl text-gray-300 mb-3"></i><p class="text-gray-500 font-medium">Anda belum memiliki produk yang aktif.</p><p class="text-sm text-gray-400">Silakan lakukan pembelian terlebih dahulu.</p></div>`;
+                return;
+            }
+            products.forEach(p => {
+                grid.innerHTML += `
+                    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col group">
+                        <div class="h-40 overflow-hidden bg-gray-50 relative">
+                            <img src="${p.image}" alt="${p.nama}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://placehold.co/400x300/eeeeee/999999?text=Gambar+Rusak'">
+                            <div class="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-sm"><i class="fa-solid fa-check-circle mr-1"></i>PAID</div>
+                        </div>
+                        <div class="p-5 flex-1 flex flex-col">
+                            <h3 class="text-lg font-bold text-gray-800 mb-2 leading-tight">${p.nama}</h3>
+                            <div class="mt-auto pt-4">
+                                <a href="${p.link}" target="_blank" class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center font-bold py-2.5 rounded-xl transition-colors shadow-sm">
+                                    <i class="fa-solid fa-unlock-keyhole mr-2"></i> Buka Akses
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function fetchData(action, tbodyId, renderFunc) {
+            const tbody = document.getElementById(tbodyId);
+            const user = JSON.parse(sessionStorage.getItem('wm_user'));
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Memuat data...</td></tr>`;
+            try {
+                const result = await callAPI(action, { tier: user.tier, affCode: user.affCode }); 
+                if(result.status === 'success' && result.data && result.data.length > 0) {
+                    tbody.innerHTML = '';
+                    result.data.forEach(row => renderFunc(tbody, row));
+                } else { 
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-500">Belum ada data di dalam tabel ini.</td></tr>`; 
+                }
+            } catch(e) { 
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-red-500">Gagal memuat data. Mohon muat ulang halaman.</td></tr>`; 
+            }
+        }
+
+        function formatDate(dateString) {
+            if(!dateString) return '-';
+            return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        
+        function formatRupiah(nom) { 
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(nom || 0); 
+        }
+
+        function renderMembers(tbody, row) {
+            const tierClass = row['Tier_Akses'] === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700';
+            tbody.innerHTML += `<tr>
+                <td class="font-mono text-xs text-gray-500">${row['User_ID']}</td>
+                <td class="font-bold text-gray-800">${row['Nama']}</td>
+                <td class="text-gray-600">${row['Email']}</td>
+                <td><span class="px-2 py-1 ${tierClass} rounded text-xs font-bold">${row['Tier_Akses']}</span></td>
+                <td class="font-mono text-xs text-gray-500 bg-gray-50 p-1 rounded inline-block mt-2">${row['Affiliate_Code']}</td>
+                <td class="text-sm text-gray-500">${formatDate(row['Tanggal_Daftar'])}</td>
+            </tr>`;
+        }
+
+        function renderProducts(tbody, row) {
+            const imgUrl = row['Image_URL'] || 'https://placehold.co/100x100/eeeeee/999999?text=No+Image';
+            const linkAkses = row['Link_Akses'] && row['Link_Akses'] !== "" ? `<a href="${row['Link_Akses']}" target="_blank" class="text-xs bg-gray-100 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg font-medium transition-colors inline-flex items-center"><i class="fa-solid fa-link mr-1"></i> Buka Akses</a>` : '-';
+            
+            let komisiTampil = row['Komisi_Affiliate'];
+            if(String(komisiTampil).includes('%')) {
+                komisiTampil = `<span class="text-purple-600 font-bold">${komisiTampil}</span>`;
+            } else {
+                komisiTampil = `<span class="text-blue-600 font-medium">${formatRupiah(komisiTampil)}</span>`;
+            }
+
+            const domain = window.location.origin + window.location.pathname.replace('index.html', '');
+            const checkoutUrl = `${domain}/checkout.html?prod=${row['Product_ID']}`;
+
+            tbody.innerHTML += `<tr>
+                <td>
+                    <div class="flex items-center">
+                        <img src="${imgUrl}" class="w-14 h-14 rounded-lg object-cover border border-gray-200 mr-3 shadow-sm">
+                        <div>
+                            <p class="font-bold text-gray-800">${row['Nama_Produk']}</p>
+                            <p class="font-mono text-xs text-gray-400 mt-0.5">${row['Product_ID']}</p>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-green-600 font-bold">${formatRupiah(row['Harga'])}</td>
+                <td>${komisiTampil}</td>
+                <td>
+                    <div class="flex flex-col gap-2 items-start">
+                        <button onclick="copyToClipboard(this, '${checkoutUrl}')" class="text-xs bg-gray-900 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium transition-colors inline-flex items-center shadow-sm">
+                            <i class="fa-regular fa-copy mr-1"></i> Link Checkout
+                        </button>
+                        ${linkAkses}
+                    </div>
+                </td>
+                <td><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">${row['Status']}</span></td>
+            </tr>`;
+        }
+
+        function copyToClipboard(btnElement, text) {
+            const tempInput = document.createElement("input");
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            
+            const originalHTML = btnElement.innerHTML;
+            btnElement.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Tersalin!';
+            btnElement.classList.replace('bg-gray-900', 'bg-green-500');
+            setTimeout(() => { 
+                btnElement.innerHTML = originalHTML; 
+                btnElement.classList.replace('bg-green-500', 'bg-gray-900'); 
+            }, 2000);
+        }
+
+        function renderTransactions(tbody, row) {
+            const isPaid = row['Status_Pembayaran'] === 'PAID';
+            const statusClass = isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+            const user = JSON.parse(sessionStorage.getItem('wm_user') || '{}');
+            let actionBtn = '-';
+            
+            if (user.tier === 'Admin' && !isPaid) {
+                actionBtn = `<button onclick="approveTx('${row['Transaction_ID']}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors whitespace-nowrap"><i class="fa-solid fa-check mr-1"></i> Approve</button>`;
+            }
+
+            const namaPembeli = row['Nama_Pembeli'] || '-';
+            const waPembeli = row['WA_Pembeli'] || '-';
+            
+            tbody.innerHTML += `<tr>
+                <td class="font-mono text-xs text-gray-500">${row['Transaction_ID']}</td>
+                <td>${formatDate(row['Tanggal'])}</td>
+                <td>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-gray-800">${namaPembeli}</span>
+                        <span class="text-xs text-gray-500">${row['Email_Pembeli']}</span>
+                        <span class="text-xs text-blue-500"><i class="fa-brands fa-whatsapp mr-1"></i>${waPembeli}</span>
+                    </div>
+                </td>
+                <td><span class="font-medium text-gray-800">${row['Produk']}</span></td>
+                <td class="font-bold text-gray-800">${formatRupiah(row['Total_Bayar'])}</td>
+                <td><span class="px-2 py-1 ${statusClass} rounded text-xs font-bold">${row['Status_Pembayaran']}</span></td>
+                <td>${actionBtn}</td>
+            </tr>`;
+        }
+
+        function renderCommissions(tbody, row) {
+            const isPaid = row['Status_Pencairan'] === 'PAID';
+            const statusClass = isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+            const user = JSON.parse(sessionStorage.getItem('wm_user') || '{}');
+            const isAdmin = user.tier === 'Admin';
+            
+            const bankInfo = row['Bank_Info'] || '-';
+            const affDisplay = isAdmin ? `<span class="font-bold text-blue-600">${row['Affiliate_Code']}</span>` : `<span class="text-gray-500">Anda</span>`;
+            
+            let actionHtml = `<td class="admin-only hidden"></td>`;
+            if(isAdmin) {
+                if(!isPaid) actionHtml = `<td class="admin-only"><button onclick="payComm('${row['Commission_ID']}')" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors whitespace-nowrap"><i class="fa-solid fa-hand-holding-dollar mr-1"></i> Bayar</button></td>`;
+                else actionHtml = `<td class="admin-only"><span class="text-xs text-gray-400">Selesai</span></td>`;
+            }
+
+            tbody.innerHTML += `<tr>
+                <td><div class="font-bold text-gray-800">${formatDate(row['Tanggal'])}</div><div class="font-mono text-[10px] text-gray-400 mt-1">${row['Commission_ID']}</div></td>
+                <td>${affDisplay}</td><td class="font-bold text-gray-800">${formatRupiah(row['Nominal'])}</td>
+                <td><span class="text-xs text-gray-600 font-medium">${bankInfo}</span></td>
+                <td><span class="px-2 py-1 ${statusClass} rounded text-xs font-bold">${row['Status_Pencairan']}</span></td>
+                ${actionHtml}
+            </tr>`;
+        }
+
+        async function approveTx(id) {
+            if(!confirm(`Yakin ingin menyetujui transaksi ${id}? Akses produk akan terbuka untuk pembeli.`)) return;
+            showLoading("Memproses persetujuan...");
+            try {
+                const result = await callAPI('approveTransaction', { transactionId: id });
+                if(result.status === 'success') { showToast(result.message, "success"); fetchData('getTransactions', 'tableBodyTransactions', renderTransactions); } 
+                else showToast(result.message, "error");
+            } catch (e) { showToast("Gagal terhubung ke server", "error"); } finally { hideLoading(); }
+        }
+
+        async function payComm(id) {
+            if(!confirm(`Tandai komisi ${id} sudah ditransfer/lunas?`)) return;
+            showLoading("Memproses pencairan...");
+            try {
+                const result = await callAPI('payCommission', { commId: id });
+                if(result.status === 'success') { showToast(result.message, "success"); fetchData('getCommissions', 'tableBodyCommissions', renderCommissions); } 
+                else showToast(result.message, "error");
+            } catch (e) { showToast("Gagal terhubung", "error"); } finally { hideLoading(); }
+        }
+
+        async function submitAddProduct(e) {
+            e.preventDefault();
+            showLoading("Menyimpan produk...");
+            
+            const commType = document.getElementById('addProdCommType').value;
+            let commValue = document.getElementById('addProdComm').value;
+            if(commType === 'persentase') commValue = commValue + '%';
+
+            const payload = {
+                nama: document.getElementById('addProdName').value,
+                harga: document.getElementById('addProdPrice').value,
+                komisi: commValue,
+                image: document.getElementById('addProdImage').value,
+                link: document.getElementById('addProdLink').value
+            };
+            try {
+                const res = await callAPI('addProduct', payload);
+                if(res.status === 'success') {
+                    showToast(res.message, "success");
+                    closeModal('modalAddProduct'); document.getElementById('formAddProduct').reset();
+                    fetchData('getProducts', 'tableBodyProducts', renderProducts);
+                } else showToast(res.message, "error");
+            } catch (e) { showToast("Gagal memproses. Coba ulangi.", "error"); } finally { hideLoading(); }
+        }
+
+        async function submitAddMember(e) {
+            e.preventDefault();
+            showLoading("Menambahkan akun...");
+            const pass = document.getElementById('addMemPass').value;
+            if(pass.length < 6) { hideLoading(); showToast("Password min. 6 karakter!", "error"); return; }
+            
+            try {
+                const payload = {
+                    nama: document.getElementById('addMemName').value,
+                    email: document.getElementById('addMemEmail').value,
+                    tier: document.getElementById('addMemTier').value,
+                    password: await hashPassword(pass)
+                };
+                const res = await callAPI('addUser', payload);
+                if(res.status === 'success') {
+                    showToast(res.message, "success");
+                    closeModal('modalAddMember'); document.getElementById('formAddMember').reset();
+                    fetchData('getMembers', 'tableBodyMembers', renderMembers);
+                } else showToast(res.message, "error");
+            } catch (e) { showToast("Gagal memproses. Coba ulangi.", "error"); } finally { hideLoading(); }
+        }
+
+        async function submitChangePassword(e) {
+            e.preventDefault();
+            const oldPass = document.getElementById('oldPass').value;
+            const newPass = document.getElementById('newPass').value;
+            if(newPass.length < 6) { showToast("Password baru minimal 6 karakter!", "error"); return; }
+            
+            showLoading("Menyimpan password...");
+            try {
+                const user = JSON.parse(sessionStorage.getItem('wm_user'));
+                const payload = { 
+                    userId: user.id, 
+                    oldPassword: await hashPassword(oldPass), 
+                    newPassword: await hashPassword(newPass) 
+                };
+                const res = await callAPI('changePassword', payload);
+                if(res.status === 'success') {
+                    showToast(res.message, "success"); 
+                    closeModal('modalChangePassword'); 
+                    document.getElementById('formChangePassword').reset();
+                } else showToast(res.message, "error");
+            } catch (e) { showToast("Gagal memproses password", "error"); } finally { hideLoading(); }
+        }
+
+        function copyAffiliateLink(btnElement) {
+            const copyText = document.getElementById("affLink");
+            copyText.select(); document.execCommand("copy");
+            const originalHTML = btnElement.innerHTML;
+            btnElement.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Tersalin!';
+            btnElement.classList.replace('bg-gray-900', 'bg-green-500');
+            setTimeout(() => { btnElement.innerHTML = originalHTML; btnElement.classList.replace('bg-green-500', 'bg-gray-900'); }, 2000);
+        }
+
+        function updateBrandUI(set) {
+            const storeName = set.storeName || "Whitelabel";
+            document.title = `Dashboard | ${storeName}`;
+            document.getElementById('sidebarBrandName').innerText = storeName;
+            document.getElementById('authBrandName').innerHTML = `${storeName}.`;
+            
+            const initHtml = storeName.substring(0, 2).toUpperCase();
+            const processLogo = (id, isSidebar) => {
+                const el = document.getElementById(id);
+                if (set.storeLogo && set.storeLogo.startsWith('http')) {
+                    el.innerHTML = `<img src="${set.storeLogo}" class="w-full h-full object-cover" alt="Logo" onerror="this.outerHTML='<span class=\\'font-bold\\'>${initHtml}</span>'">`;
+                    el.classList.remove('bg-white/20', 'bg-brandblue', 'text-white', 'text-2xl');
+                    el.classList.add('bg-transparent');
+                } else {
+                    el.innerHTML = `<span class="font-bold">${initHtml}</span>`;
+                    el.classList.remove('bg-transparent');
+                    if(isSidebar) el.classList.add('bg-brandblue', 'text-white');
+                    else el.classList.add('bg-white/20', 'text-white', 'text-2xl');
+                }
+            };
+            processLogo('sidebarBrandLogo', true);
+            processLogo('authBrandLogo', false);
+        }
+
+        function addBankField(bank = '', rek = '', owner = '') {
+            const container = document.getElementById('bankList');
+            const div = document.createElement('div');
+            div.className = 'flex flex-col sm:flex-row gap-3 items-center bg-gray-50 p-3 rounded-xl border border-gray-200 bank-item';
+            div.innerHTML = `
+                <input type="text" placeholder="Nama Bank" value="${bank}" class="bank-name w-full sm:w-1/3 px-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500 text-sm">
+                <input type="text" placeholder="No. Rekening" value="${rek}" class="bank-rek w-full sm:w-1/3 px-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500 text-sm">
+                <input type="text" placeholder="Atas Nama" value="${owner}" class="bank-owner w-full sm:w-1/3 px-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500 text-sm">
+                <button type="button" onclick="this.parentElement.remove()" class="w-full sm:w-auto text-red-500 bg-red-50 hover:bg-red-500 hover:text-white p-2 rounded-lg transition-colors"><i class="fa-solid fa-trash"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        async function fetchStoreSettings(isBackground = false) {
+            if(!isBackground) showLoading("Memuat pengaturan...");
+            try {
+                const result = await callAPI('getSettings');
+                if (result.status === 'success' && result.settings) {
+                    updateBrandUI(result.settings);
+                    if(!isBackground) {
+                        const set = result.settings;
+                        document.getElementById('setStoreName').value = set.storeName || "";
+                        document.getElementById('setStoreLogo').value = set.storeLogo || "";
+                        
+                        const waStr = String(set.waAdmin || "");
+                        document.getElementById('setWa').value = waStr.startsWith('62') ? waStr.substring(2) : waStr;
+                        document.getElementById('setQris').value = set.qrisImage || "";
+                        
+                        if(document.getElementById('setFormName')) document.getElementById('setFormName').value = set.formName || "required";
+                        if(document.getElementById('setFormWa')) document.getElementById('setFormWa').value = set.formWa || "optional";
+                        
+                        document.getElementById('bankList').innerHTML = '';
+                        if (set.banks && set.banks.length > 0) set.banks.forEach(b => addBankField(b.bank, b.rek, b.owner));
+                        else addBankField();
+                    }
+                } else if(!isBackground) showToast("Gagal memuat: " + (result.message||""), "error");
+            } catch (e) { 
+                if(!isBackground) showToast(e.message || "Gagal memuat pengaturan toko", "error"); 
+            } finally { 
+                if(!isBackground) hideLoading(); 
+            }
+        }
+
+        async function handleSaveSettings(e) {
+            e.preventDefault();
+            showLoading("Menyimpan pengaturan...");
+            let waRaw = document.getElementById('setWa').value.replace(/\D/g,'');
+            if (waRaw.startsWith('0')) waRaw = waRaw.substring(1);
+            
+            let banksArr = [];
+            document.querySelectorAll('.bank-item').forEach(item => {
+                const n = item.querySelector('.bank-name').value, r = item.querySelector('.bank-rek').value, o = item.querySelector('.bank-owner').value;
+                if(n && r) banksArr.push({ bank: n, rek: r, owner: o });
+            });
+
+            const payload = {
+                storeName: document.getElementById('setStoreName').value, 
+                storeLogo: document.getElementById('setStoreLogo').value,
+                waAdmin: waRaw ? "62" + waRaw : "", 
+                qrisImage: document.getElementById('setQris').value, 
+                banks: banksArr,
+                formName: document.getElementById('setFormName').value,
+                formWa: document.getElementById('setFormWa').value
+            };
+            try {
+                const result = await callAPI('saveSettings', payload);
+                if(result.status === 'success') { showToast("Tersimpan!", "success"); fetchStoreSettings(true); } 
+                else showToast("Gagal: " + result.message, "error");
+            } catch (error) { showToast(error.message || "Gagal menyimpan ke server.", "error"); } finally { hideLoading(); }
+        }
+
+        async function fetchMemberBank() {
+            showLoading("Memuat data rekening...");
+            try {
+                const user = JSON.parse(sessionStorage.getItem('wm_user'));
+                const result = await callAPI('getMemberBank', { email: user.email });
+                if (result.status === 'success' && result.data) {
+                    document.getElementById('memBankName').value = result.data.bankName || "";
+                    document.getElementById('memBankRek').value = result.data.bankRek || "";
+                    document.getElementById('memBankOwner').value = result.data.bankOwner || "";
+                }
+            } catch (e) { showToast("Gagal memuat bank", "error"); } finally { hideLoading(); }
+        }
+
+        async function handleSaveMemberBank(e) {
+            e.preventDefault();
+            showLoading("Menyimpan rekening...");
+            try {
+                const user = JSON.parse(sessionStorage.getItem('wm_user'));
+                const payload = {
+                    email: user.email,
+                    bankName: document.getElementById('memBankName').value,
+                    bankRek: document.getElementById('memBankRek').value,
+                    bankOwner: document.getElementById('memBankOwner').value
+                };
+                const result = await callAPI('updateMemberBank', payload);
+                if (result.status === 'success') showToast(result.message, "success");
+                else showToast(result.message, "error");
+            } catch (error) { showToast("Gagal menyimpan ke server", "error"); } finally { hideLoading(); }
+        }
+
+        function setupChart() {
+            const ctx = document.getElementById('transactionChart');
+            if(!ctx) return;
+            const context = ctx.getContext('2d');
+            if(window.myChart) return;
+            let gradient = context.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)'); gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+            window.myChart = new Chart(context, {
+                type: 'line',
+                data: { labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'], datasets: [{ label: 'Aktivitas', data: [12, 19, 15, 25, 22, 30, 28], borderColor: '#3b82f6', backgroundColor: gradient, borderWidth: 3, fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => checkLoginState());
+    </script>
+</body>
+</html>
